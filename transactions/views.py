@@ -10,16 +10,30 @@ from decimal import Decimal
 from .models import Transaction, Category
 from accounts.models import Account
 from .forms import TransactionForm, CategoryForm, TransferForm
+from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
+
 
 def transaction_list(request):
-    transactions = Transaction.objects.all().order_by('-date')
+    transactions_list = Transaction.objects.all().order_by('-date')
     categories = Category.objects.all().order_by('name')
+    
+    # Set up pagination
+    page = request.GET.get('page', 1)
+    paginator = Paginator(transactions_list, 20)  # Show 20 transactions per page
+    
+    try:
+        transactions = paginator.page(page)
+    except PageNotAnInteger:
+        transactions = paginator.page(1)  # If page is not an integer, deliver first page
+    except EmptyPage:
+        transactions = paginator.page(paginator.num_pages)  # If page is out of range, deliver last page
     
     context = {
         'transactions': transactions,
         'categories': categories,
     }
     return render(request, 'transactions/transaction_list.html', context)
+
 
 def transaction_create(request):
     if request.method == 'POST':

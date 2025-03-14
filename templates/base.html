@@ -280,6 +280,31 @@
                 margin-left: 0;
             }
         }
+
+        .pagination {
+            flex-wrap: wrap;
+        }
+        .page-link {
+            padding: 0.375rem 0.75rem;
+            border-radius: 6px;
+            margin: 0 2px;
+            color: var(--primary-color);
+            border: 1px solid var(--border-color);
+            transition: all 0.2s;
+        }
+        .page-link:hover {
+            background-color: var(--primary-light);
+            color: var(--primary-color);
+            border-color: var(--primary-color);
+        }
+        .page-item.active .page-link {
+            background-color: var(--primary-color);
+            border-color: var(--primary-color);
+        }
+        .page-item.disabled .page-link {
+            color: var(--text-secondary);
+        }
+        
     </style>
     
     {% block extra_css %}{% endblock %}

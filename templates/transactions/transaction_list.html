@@ -31,7 +31,11 @@
             <div class="card-header d-flex justify-content-between align-items-center">
                 <h5 class="mb-0">
                     <i class="fas fa-list text-primary me-2"></i> All Transactions
+                    <span class="badge bg-primary ms-2">{{ transactions.paginator.count }}</span>
                 </h5>
+                <div>
+                    <span class="text-secondary me-3">Page {{ transactions.number }} of {{ transactions.paginator.num_pages }}</span>
+                </div>
             </div>
             <div class="card-body p-0">
                 {% if transactions %}
@@ -92,6 +96,69 @@
                         </tbody>
                     </table>
                 </div>
+                {% if transactions.paginator.num_pages > 1 %}
+                <div class="card-footer">
+                    <nav aria-label="Transaction pagination">
+                        <ul class="pagination justify-content-center mb-0">
+                            {% if transactions.has_previous %}
+                                <li class="page-item">
+                                    <a class="page-link" href="?page=1" aria-label="First">
+                                        <span aria-hidden="true">&laquo;&laquo;</span>
+                                    </a>
+                                </li>
+                                <li class="page-item">
+                                    <a class="page-link" href="?page={{ transactions.previous_page_number }}" aria-label="Previous">
+                                        <span aria-hidden="true">&laquo;</span>
+                                    </a>
+                                </li>
+                            {% else %}
+                                <li class="page-item disabled">
+                                    <a class="page-link" href="#" aria-label="First">
+                                        <span aria-hidden="true">&laquo;&laquo;</span>
+                                    </a>
+                                </li>
+                                <li class="page-item disabled">
+                                    <a class="page-link" href="#" aria-label="Previous">
+                                        <span aria-hidden="true">&laquo;</span>
+                                    </a>
+                                </li>
+                            {% endif %}
+                            
+                            {% for num in transactions.paginator.page_range %}
+                                {% if transactions.number == num %}
+                                    <li class="page-item active"><a class="page-link" href="?page={{ num }}">{{ num }}</a></li>
+                                {% elif num > transactions.number|add:'-3' and num < transactions.number|add:'3' %}
+                                    <li class="page-item"><a class="page-link" href="?page={{ num }}">{{ num }}</a></li>
+                                {% endif %}
+                            {% endfor %}
+                            
+                            {% if transactions.has_next %}
+                                <li class="page-item">
+                                    <a class="page-link" href="?page={{ transactions.next_page_number }}" aria-label="Next">
+                                        <span aria-hidden="true">&raquo;</span>
+                                    </a>
+                                </li>
+                                <li class="page-item">
+                                    <a class="page-link" href="?page={{ transactions.paginator.num_pages }}" aria-label="Last">
+                                        <span aria-hidden="true">&raquo;&raquo;</span>
+                                    </a>
+                                </li>
+                            {% else %}
+                                <li class="page-item disabled">
+                                    <a class="page-link" href="#" aria-label="Next">
+                                        <span aria-hidden="true">&raquo;</span>
+                                    </a>
+                                </li>
+                                <li class="page-item disabled">
+                                    <a class="page-link" href="#" aria-label="Last">
+                                        <span aria-hidden="true">&raquo;&raquo;</span>
+                                    </a>
+                                </li>
+                            {% endif %}
+                        </ul>
+                    </nav>
+                </div>
+                {% endif %}
                 {% else %}
                 <div class="text-center py-4">
                     <i class="fas fa-exchange-alt fa-3x text-muted mb-3"></i>
@@ -110,23 +177,19 @@
         </div>
     </div>
 </div>
-<div class="d-flex justify-content-between align-items-center">
-    <h1>
-        <i class="fas fa-exchange-alt text-primary me-2"></i> Transactions
-    </h1>
-    <div>
-        <a href="{% url 'transaction_create' %}" class="btn btn-primary">
-            <i class="fas fa-plus me-1"></i> Add Transaction
-        </a>
-        <a href="{% url 'create_transfer' %}" class="btn btn-success ms-2">
-            <i class="fas fa-exchange-alt me-1"></i> Make Transfer
-        </a>
-        <a href="{% url 'import_transactions_csv' %}" class="btn btn-info ms-2 text-white">
-            <i class="fas fa-file-import me-1"></i> Import CSV
-        </a>
-        <a href="{% url 'export_transactions_csv' %}" class="btn btn-warning ms-2">
-            <i class="fas fa-file-export me-1"></i> Export CSV
-        </a>
+
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center">
+            <div>
+                <a href="{% url 'import_transactions_csv' %}" class="btn btn-info text-white">
+                    <i class="fas fa-file-import me-1"></i> Import CSV
+                </a>
+                <a href="{% url 'export_transactions_csv' %}" class="btn btn-warning ms-2">
+                    <i class="fas fa-file-export me-1"></i> Export CSV
+                </a>
+            </div>
+        </div>
     </div>
 </div>
 {% endblock %}
