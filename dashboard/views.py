@@ -9,13 +9,19 @@ import datetime
 
 def home(request):
     # Get all accounts
-    accounts = Account.objects.all()
+    accounts = Account.objects.all().order_by('-current_balance')
     
     # Calculate total balance
     total_balance = sum(account.current_balance for account in accounts)
     
     # Get recent transactions (last 5)
-    recent_transactions = Transaction.objects.all().order_by('-date')[:5]
+    # recent_transactions = Transaction.objects.all().order_by('-date')[:5]
+    today = datetime.date.today()
+    first_day_of_month = datetime.date(today.year, today.month, 1)
+    recent_transactions = Transaction.objects.filter(
+        date__gte=first_day_of_month,
+        date__lte=today
+    ).order_by('-date')
     
     context = {
         'accounts': accounts,

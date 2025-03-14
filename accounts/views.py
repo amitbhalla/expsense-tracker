@@ -4,7 +4,7 @@ from .models import Account, AccountType
 from .forms import AccountForm, AccountTypeForm
 
 def account_list(request):
-    accounts = Account.objects.all().order_by('name')
+    accounts = Account.objects.all().order_by('-current_balance')
     account_types = AccountType.objects.all().order_by('name')
     
     # Calculate total balance
