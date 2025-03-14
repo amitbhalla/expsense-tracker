@@ -1,0 +1,634 @@
+{% extends 'base.html' %}
+{% load currency_format %}
+{% block title %}Analytics - Expense Tracker{% endblock %}
+
+{% block extra_css %}
+<style>
+    .date-range-selector {
+        background-color: white;
+        border-radius: 12px;
+        padding: 20px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+        margin-bottom: 24px;
+        border: 1px solid rgba(59, 130, 246, 0.1);
+    }
+    
+    .chart-container {
+        position: relative;
+        height: 350px;
+        margin-bottom: 20px;
+    }
+    
+    .card-analytics {
+        background-color: white;
+        border: none;
+        border-radius: 12px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+        overflow: hidden;
+        transition: all 0.3s ease;
+    }
+    
+    .card-analytics:hover {
+        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+        transform: translateY(-5px);
+    }
+    
+    .card-analytics .card-header {
+        border-bottom: 1px solid rgba(59, 130, 246, 0.1);
+        background-color: white;
+        padding: 16px 20px;
+        font-weight: 600;
+    }
+    
+    /* Override Chart.js default styles */
+    canvas {
+        border-radius: 8px;
+    }
+    
+    .debug-panel {
+        background-color: #f8fafc;
+        border-radius: 8px;
+        padding: 16px;
+        margin-bottom: 16px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row slide-in">
+    <div class="col-12 mb-4">
+        <div class="d-flex justify-content-between align-items-center">
+            <h1>
+                <i class="fas fa-chart-pie text-primary me-2"></i> Analytics & Reports
+            </h1>
+        </div>
+        <hr>
+    </div>
+</div>
+
+<!-- Date Range Selector -->
+<div class="row slide-in">
+    <div class="col-12">
+        <div class="date-range-selector">
+            <form method="get" action="{% url 'dashboard' %}">
+                <div class="row align-items-center">
+                    <div class="col-md-4">
+                        <h5 class="fw-bold mb-0 text-primary">Select Date Range</h5>
+                        <p class="text-secondary small mt-1 mb-0">Filter transactions by date</p>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="mb-2 mb-md-0">
+                            <label for="start_date" class="form-label small fw-medium text-secondary">Start Date</label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-light border-end-0">
+                                    <i class="fas fa-calendar-alt text-primary"></i>
+                                </span>
+                                <input type="date" class="form-control border-start-0 ps-0" id="start_date" name="start_date" value="{{ start_date|date:'Y-m-d' }}">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="mb-2 mb-md-0">
+                            <label for="end_date" class="form-label small fw-medium text-secondary">End Date</label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-light border-end-0">
+                                    <i class="fas fa-calendar-alt text-primary"></i>
+                                </span>
+                                <input type="date" class="form-control border-start-0 ps-0" id="end_date" name="end_date" value="{{ end_date|date:'Y-m-d' }}">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="d-block text-white" style="visibility: hidden;">Apply</label>
+                        <button type="submit" class="btn btn-primary w-100 shadow-sm">
+                            <i class="fas fa-filter me-2"></i> Apply Filter
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div class="row slide-in g-4">
+    <!-- Category Spending Chart -->
+    <div class="col-md-6 mb-4">
+        <div class="card card-analytics h-100">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">
+                    <i class="fas fa-chart-pie text-primary me-2"></i> Spending by Category
+                </h5>
+                <span class="badge bg-danger-light text-danger fw-medium py-2 px-3">
+                    <i class="fas fa-calendar-alt me-1"></i> {{ start_date|date:"M d, Y" }} - {{ end_date|date:"M d, Y" }}
+                </span>
+            </div>
+            <div class="card-body p-4">
+                <div class="chart-container">
+                    <canvas id="categorySpendingChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Category Income Chart -->
+    <div class="col-md-6 mb-4">
+        <div class="card card-analytics h-100">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">
+                    <i class="fas fa-chart-pie text-primary me-2"></i> Income by Category
+                </h5>
+                <span class="badge bg-success-light text-success fw-medium py-2 px-3">
+                    <i class="fas fa-calendar-alt me-1"></i> {{ start_date|date:"M d, Y" }} - {{ end_date|date:"M d, Y" }}
+                </span>
+            </div>
+            <div class="card-body p-4">
+                <div class="chart-container">
+                    <canvas id="categoryIncomeChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row slide-in">
+    <!-- Monthly Trend Chart -->
+    <div class="col-12 mb-4">
+        <div class="card card-analytics">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">
+                    <i class="fas fa-chart-line text-primary me-2"></i> Monthly Income vs Expenses
+                </h5>
+                <span class="badge bg-primary-light text-primary-dark fw-medium py-2 px-3">
+                    <i class="fas fa-calendar me-1"></i> Trend Analysis
+                </span>
+            </div>
+            <div class="card-body p-4">
+                <div class="chart-container">
+                    <canvas id="monthlyTrendChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row slide-in">
+    <!-- Year-on-Year Growth Chart -->
+    <div class="col-12 mb-4">
+        <div class="card card-analytics">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">
+                    <i class="fas fa-chart-area text-primary me-2"></i> Year-on-Year Growth
+                </h5>
+                <span class="badge bg-primary-light text-primary-dark fw-medium py-2 px-3">
+                    <i class="fas fa-percentage me-1"></i> Annual Comparison
+                </span>
+            </div>
+            <div class="card-body p-4">
+                <div class="chart-container">
+                    <canvas id="yoyGrowthChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Transactions Table -->
+<div class="row slide-in">
+    <div class="col-12 mb-4">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">
+                    <i class="fas fa-list text-primary me-2"></i> Transactions ({{ start_date|date:"M d, Y" }} - {{ end_date|date:"M d, Y" }})
+                </h5>
+                <a href="{% url 'export_transactions_csv' %}" class="btn btn-sm btn-warning">
+                    <i class="fas fa-file-export me-1"></i> Export CSV
+                </a>
+            </div>
+            <div class="card-body p-0">
+                {% if transactions %}
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Account</th>
+                                <th>Category</th>
+                                <th>Description</th>
+                                <th>Type</th>
+                                <th class="text-end">Amount</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for transaction in transactions %}
+                            <tr>
+                                <td>{{ transaction.date }}</td>
+                                <td>{{ transaction.account.name }}</td>
+                                <td>{{ transaction.category.name }}</td>
+                                <td>{{ transaction.description|truncatechars:30 }}</td>
+                                <td>
+                                    {% if transaction.transaction_type == 'INCOME' %}
+                                    <span class="badge bg-success">Income</span>
+                                    {% elif transaction.transaction_type == 'EXPENSE' %}
+                                    <span class="badge bg-danger">Expense</span>
+                                    {% elif transaction.transaction_type == 'TRANSFER' %}
+                                    <span class="badge bg-info">Transfer</span>
+                                    {% endif %}
+                                </td>
+                                <td class="text-end {% if transaction.transaction_type == 'EXPENSE' %}text-expense{% elif transaction.transaction_type == 'INCOME' %}text-income{% endif %}">
+                                    {% if transaction.transaction_type == 'EXPENSE' %}-{% endif %}
+                                    {% if transaction.transaction_type == 'INCOME' %}+{% endif %}
+                                    ₹ {{ transaction.amount|indian_currency }}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="text-center py-4">
+                    <i class="fas fa-chart-bar fa-3x text-muted mb-3"></i>
+                    <p>No transactions found in the selected date range.</p>
+                    <a href="{% url 'transaction_create' %}" class="btn btn-primary">
+                        <i class="fas fa-plus me-1"></i> Add Transaction
+                    </a>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Debug Information Panel -->
+<div class="row slide-in">
+    <div class="col-12 mb-4">
+        <div class="card">
+            <div class="card-header bg-secondary text-white d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">
+                    <i class="fas fa-bug me-2"></i> Debug Information
+                </h5>
+                <button class="btn btn-sm btn-light" id="toggle-debug">Show/Hide Details</button>
+            </div>
+            <div class="card-body" id="debug-content" style="display: none;">
+                <div class="debug-panel">
+                    <h6>Chart.js Status: <span id="chartjs-status">Checking...</span></h6>
+                    <h6>Chart.js Version: <span id="chartjs-version">Unknown</span></h6>
+                </div>
+                
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6 class="border-bottom pb-2">Category Spending Data:</h6>
+                        <pre class="bg-light p-3 rounded">{{ category_spending_data }}</pre>
+                        
+                        <h6 class="mt-4 border-bottom pb-2">Raw Spending Categories:</h6>
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Category</th>
+                                    <th>Amount</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in category_spending %}
+                                <tr>
+                                    <td>{{ item.category__name }}</td>
+                                    <td>{{ item.total }}</td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="2">No spending categories found</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="col-md-6">
+                        <h6 class="border-bottom pb-2">Category Income Data:</h6>
+                        <pre class="bg-light p-3 rounded">{{ category_income_data }}</pre>
+                        
+                        <h6 class="mt-4 border-bottom pb-2">Raw Income Categories:</h6>
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Category</th>
+                                    <th>Amount</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in category_income %}
+                                <tr>
+                                    <td>{{ item.category__name }}</td>
+                                    <td>{{ item.total }}</td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="2">No income categories found</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                
+                <h6 class="mt-4 border-bottom pb-2">Monthly Trend Data:</h6>
+                <pre class="bg-light p-3 rounded">{{ monthly_trend_data }}</pre>
+                
+                <h6 class="mt-4 border-bottom pb-2">Transaction Types in Database:</h6>
+                <ul>
+                    {% for type in transaction_types %}
+                    <li><code>{{ type }}</code> (Length: {{ type|length }})</li>
+                    {% empty %}
+                    <li>No transaction types found</li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Alert if transactions but no chart data -->
+{% if transactions.count > 0 %}
+<div class="row">
+    <div class="col-12" id="chart-data-warning" style="display: none;">
+        <div class="alert alert-info mb-4">
+            <div class="d-flex">
+                <div class="me-3">
+                    <i class="fas fa-info-circle fa-2x"></i>
+                </div>
+                <div>
+                    <h5 class="alert-heading">Chart Data Issue</h5>
+                    <p class="mb-0">
+                        There appears to be an issue with your transaction types. Your transactions might be using different 
+                        capitalization than expected (e.g., "income" instead of "INCOME"). I've updated the system to handle 
+                        this case-insensitively, so please try refreshing or adding a new transaction.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Debug toggle button
+    document.getElementById('toggle-debug').addEventListener('click', function() {
+        const debugContent = document.getElementById('debug-content');
+        debugContent.style.display = debugContent.style.display === 'none' ? 'block' : 'none';
+    });
+    
+    // Check if Chart is defined
+    if (typeof Chart === 'undefined') {
+        document.getElementById('chartjs-status').textContent = "NOT LOADED!";
+        console.error("Chart.js is not loaded!");
+        alert("Chart.js library is not loaded. Please check your internet connection.");
+    } else {
+        document.getElementById('chartjs-status').textContent = "Loaded Successfully";
+        document.getElementById('chartjs-version').textContent = Chart.version;
+        
+        // Function to format numbers in Indian currency format
+        function formatIndianCurrency(num) {
+            if (isNaN(num)) return "0.00";
+            
+            let numStr = num.toFixed(2);
+            let parts = numStr.split('.');
+            let integerPart = parts[0];
+            let decimalPart = parts[1];
+            
+            // For negative numbers
+            let sign = '';
+            if (integerPart.startsWith('-')) {
+                sign = '-';
+                integerPart = integerPart.substring(1);
+            }
+            
+            // Format with commas (Indian format)
+            let result = '';
+            if (integerPart.length <= 3) {
+                result = integerPart;
+            } else {
+                // Add the first group (rightmost 3 digits)
+                result = integerPart.substring(integerPart.length - 3);
+                
+                // Add the remaining groups (2 digits each)
+                let remaining = integerPart.substring(0, integerPart.length - 3);
+                
+                while (remaining.length > 0) {
+                    if (remaining.length >= 2) {
+                        result = remaining.substring(remaining.length - 2) + "," + result;
+                        remaining = remaining.substring(0, remaining.length - 2);
+                    } else {
+                        result = remaining + "," + result;
+                        remaining = "";
+                    }
+                }
+            }
+            
+            return sign + result + '.' + decimalPart;
+        }
+        
+        // Create a very simple test chart first
+        /*try {
+            console.log("Creating simple test chart...");
+            new Chart(document.getElementById('testChart').getContext('2d'), {
+                type: 'bar',
+                data: {
+                    labels: ['Red', 'Blue', 'Yellow', 'Green', 'Purple', 'Orange'],
+                    datasets: [{
+                        label: 'Test Data',
+                        data: [12, 19, 3, 5, 2, 3],
+                        backgroundColor: [
+                            'rgba(255, 99, 132, 0.2)',
+                            'rgba(54, 162, 235, 0.2)',
+                            'rgba(255, 206, 86, 0.2)',
+                            'rgba(75, 192, 192, 0.2)',
+                            'rgba(153, 102, 255, 0.2)',
+                            'rgba(255, 159, 64, 0.2)'
+                        ],
+                        borderColor: [
+                            'rgba(255, 99, 132, 1)',
+                            'rgba(54, 162, 235, 1)',
+                            'rgba(255, 206, 86, 1)',
+                            'rgba(75, 192, 192, 1)',
+                            'rgba(153, 102, 255, 1)',
+                            'rgba(255, 159, 64, 1)'
+                        ],
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+            console.log("Test chart created successfully");
+        } catch (error) {
+            console.error("Error creating test chart:", error);
+        }*/
+        
+        // Parse the data from Django
+        const spendingData = {{ category_spending_data|safe }};
+        const incomeData = {{ category_income_data|safe }};
+        const monthlyData = {{ monthly_trend_data|safe }};
+        const growthData = {{ yoy_growth_data|safe }};
+        
+        // Create the charts one by one with proper error handling
+        try {
+            // 1. Spending by Category Chart
+            if (spendingData.labels && spendingData.labels.length > 0) {
+                new Chart(document.getElementById('categorySpendingChart').getContext('2d'), {
+                    type: 'doughnut',
+                    data: {
+                        labels: spendingData.labels,
+                        datasets: [{
+                            data: spendingData.data,
+                            backgroundColor: [
+                                '#f87171', '#60a5fa', '#fbbf24', '#34d399', '#a78bfa',
+                                '#f472b6', '#38bdf8', '#fb923c', '#4ade80', '#818cf8'
+                            ]
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false
+                    }
+                });
+            } else {
+                const ctx = document.getElementById('categorySpendingChart').getContext('2d');
+                ctx.font = '14px Arial';
+                ctx.fillStyle = 'gray';
+                ctx.textAlign = 'center';
+                ctx.fillText('No expense data for this period', ctx.canvas.width/2, ctx.canvas.height/2);
+            }
+        } catch (error) {
+            console.error("Error creating spending chart:", error);
+        }
+        
+        try {
+            // 2. Income by Category Chart
+            if (incomeData.labels && incomeData.labels.length > 0) {
+                new Chart(document.getElementById('categoryIncomeChart').getContext('2d'), {
+                    type: 'doughnut',
+                    data: {
+                        labels: incomeData.labels,
+                        datasets: [{
+                            data: incomeData.data,
+                            backgroundColor: [
+                                '#10b981', '#3b82f6', '#8b5cf6', '#f59e0b', '#06b6d4',
+                                '#14b8a6', '#0ea5e9', '#6366f1', '#8b5cf6', '#ec4899'
+                            ]
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false
+                    }
+                });
+            } else {
+                const ctx = document.getElementById('categoryIncomeChart').getContext('2d');
+                ctx.font = '14px Arial';
+                ctx.fillStyle = 'gray';
+                ctx.textAlign = 'center';
+                ctx.fillText('No income data for this period', ctx.canvas.width/2, ctx.canvas.height/2);
+            }
+        } catch (error) {
+            console.error("Error creating income chart:", error);
+        }
+        
+        try {
+            // 3. Monthly Trend Chart
+            if (monthlyData.labels && monthlyData.labels.length > 0) {
+                new Chart(document.getElementById('monthlyTrendChart').getContext('2d'), {
+                    type: 'bar',
+                    data: {
+                        labels: monthlyData.labels,
+                        datasets: [
+                            {
+                                label: 'Income',
+                                data: monthlyData.income,
+                                backgroundColor: 'rgba(16, 185, 129, 0.7)'
+                            },
+                            {
+                                label: 'Expenses',
+                                data: monthlyData.spending,
+                                backgroundColor: 'rgba(239, 68, 68, 0.7)'
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            y: {
+                                beginAtZero: true
+                            }
+                        }
+                    }
+                });
+            } else {
+                const ctx = document.getElementById('monthlyTrendChart').getContext('2d');
+                ctx.font = '14px Arial';
+                ctx.fillStyle = 'gray';
+                ctx.textAlign = 'center';
+                ctx.fillText('No monthly data for this period', ctx.canvas.width/2, ctx.canvas.height/2);
+            }
+        } catch (error) {
+            console.error("Error creating monthly trend chart:", error);
+        }
+        
+        try {
+            // 4. Year-on-Year Growth Chart
+            if (growthData.labels && growthData.labels.length > 0) {
+                new Chart(document.getElementById('yoyGrowthChart').getContext('2d'), {
+                    type: 'line',
+                    data: {
+                        labels: growthData.labels,
+                        datasets: [
+                            {
+                                label: 'Income',
+                                data: growthData.income_values,
+                                borderColor: '#10b981',
+                                backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                                fill: true
+                            },
+                            {
+                                label: 'Expenses',
+                                data: growthData.expense_values,
+                                borderColor: '#ef4444',
+                                backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                                fill: true
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false
+                    }
+                });
+            } else {
+                const ctx = document.getElementById('yoyGrowthChart').getContext('2d');
+                ctx.font = '14px Arial';
+                ctx.fillStyle = 'gray';
+                ctx.textAlign = 'center';
+                ctx.fillText('No yearly growth data available', ctx.canvas.width/2, ctx.canvas.height/2);
+            }
+        } catch (error) {
+            console.error("Error creating growth chart:", error);
+        }
+        
+        // Check if we have transactions but empty charts
+        const transactionCount = {{ transactions.count }};
+        const categorySpendingCount = {{ category_spending|length }};
+        const categoryIncomeCount = {{ category_income|length }};
+        
+        if (transactionCount > 0 && (categorySpendingCount === 0 && categoryIncomeCount === 0)) {
+            document.getElementById('chart-data-warning').style.display = 'block';
+        }
+    }
+});
+</script>
+{% endblock %}

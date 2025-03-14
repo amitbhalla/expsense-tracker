@@ -1,0 +1,120 @@
+{% extends 'base.html' %}
+{% block title %}Import Transactions - Expense Tracker{% endblock %}
+
+{% block content %}
+<div class="row slide-in">
+    <div class="col-12 mb-4">
+        <div class="d-flex justify-content-between align-items-center">
+            <h1>
+                <i class="fas fa-file-import text-primary me-2"></i> Import Transactions
+            </h1>
+        </div>
+        <hr>
+    </div>
+</div>
+
+<div class="row slide-in">
+    <div class="col-lg-8 offset-lg-2">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">CSV File Import</h5>
+                <a href="{% url 'download_csv_template' %}" class="btn btn-sm btn-outline-primary">
+                    <i class="fas fa-download me-1"></i> Download Template
+                </a>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-info mb-4">
+                    <h5 class="alert-heading mb-3"><i class="fas fa-info-circle me-2"></i>Import Instructions</h5>
+                    <p class="mb-3">Please prepare your CSV file with the following columns:</p>
+                    <div class="table-responsive">
+                        <table class="table table-bordered table-sm mb-3">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Column</th>
+                                    <th>Description</th>
+                                    <th>Example</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td width="20%"><strong>Date</strong></td>
+                                    <td>Transaction date in YYYY-MM-DD format</td>
+                                    <td>2025-03-12</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Account Name</strong></td>
+                                    <td>Must match an existing account name exactly</td>
+                                    <td>HDFC Saving 62</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Transaction Category</strong></td>
+                                    <td>Will be created if it doesn't exist</td>
+                                    <td>Groceries</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Type</strong></td>
+                                    <td>Must be either "Income" or "Expense"</td>
+                                    <td>Expense</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Amount</strong></td>
+                                    <td>Positive number (with or without decimals)</td>
+                                    <td>1000.50</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <p class="mb-0">Example row: <code>2025-03-12,HDFC Saving 62,Groceries,Expense,1000.50</code></p>
+                </div>
+                
+                <form method="post" enctype="multipart/form-data" class="mb-4">
+                    {% csrf_token %}
+                    <div class="mb-4">
+                        <label for="csv_file" class="form-label fw-medium">Choose CSV File</label>
+                        <input class="form-control" type="file" id="csv_file" name="csv_file" accept=".csv" required>
+                        <div class="form-text">
+                            File must be in CSV format with comma-separated values.
+                        </div>
+                    </div>
+                    <div class="d-flex justify-content-between">
+                        <a href="{% url 'transaction_list' %}" class="btn btn-secondary">
+                            <i class="fas fa-arrow-left me-1"></i> Back to Transactions
+                        </a>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-file-import me-1"></i> Import Transactions
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        
+        <div class="card mt-4">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-lightbulb text-warning me-2"></i> Tips for Successful Import</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6 class="mb-3 fw-bold text-primary"><i class="fas fa-check me-2"></i> Before Importing:</h6>
+                        <ul class="mb-0">
+                            <li class="mb-2">Create all required accounts first</li>
+                            <li class="mb-2">Ensure account names match exactly</li>
+                            <li class="mb-2">Check that dates are formatted consistently</li>
+                            <li class="mb-2">Verify transaction types are "Income" or "Expense"</li>
+                        </ul>
+                    </div>
+                    <div class="col-md-6">
+                        <h6 class="mb-3 fw-bold text-primary"><i class="fas fa-exclamation-triangle me-2"></i> Common Issues:</h6>
+                        <ul class="mb-0">
+                            <li class="mb-2">Invalid date formats</li>
+                            <li class="mb-2">Missing required fields</li>
+                            <li class="mb-2">Accounts that don't exist in the system</li>
+                            <li class="mb-2">Incorrect amount formatting (use positive numbers only)</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

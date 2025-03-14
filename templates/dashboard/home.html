@@ -1,0 +1,193 @@
+{% extends 'base.html' %}
+{% load currency_format %}
+{% block title %}Home - Expense Tracker{% endblock %}
+
+{% block content %}
+<div class="row slide-in">
+    <div class="col-12 mb-4">
+        <h1 class="display-4 fw-bold">
+            <i class="fas fa-wallet text-primary me-2"></i> Welcome to Your Expense Tracker
+        </h1>
+        <p class="lead">Track your finances, manage accounts, and visualize your spending.</p>
+        <hr>
+    </div>
+</div>
+
+<div class="row slide-in">
+    <!-- Total Balance Card -->
+    <div class="col-lg-12 mb-4">
+        <div class="card balance-card h-100">
+            <div class="card-body text-center p-5">
+                <h5 class="card-title">TOTAL BALANCE</h5>
+                <p class="balance">₹ {{ total_balance|indian_currency }}</p>
+                <div class="mt-4">
+                    <a href="{% url 'account_list' %}" class="btn btn-light btn-lg px-4">
+                        <i class="fas fa-eye me-2"></i> View Accounts
+                    </a>
+                    <a href="{% url 'transaction_create' %}" class="btn btn-success btn-lg ms-3 px-4">
+                        <i class="fas fa-plus me-2"></i> Add Transaction
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4 slide-in">
+    <!-- Accounts Summary -->
+    <div class="col-lg-6 mb-4">
+        <div class="card h-100">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">
+                    <i class="fas fa-university text-primary me-2"></i> Your Accounts
+                </h5>
+                <a href="{% url 'account_create' %}" class="btn btn-sm btn-primary">
+                    <i class="fas fa-plus"></i> Add
+                </a>
+            </div>
+            <div class="card-body p-0">
+                {% if accounts %}
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead>
+                            <tr>
+                                <th>Account</th>
+                                <th>Type</th>
+                                <th class="text-end">Balance</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for account in accounts %}
+                            <tr>
+                                <td class="fw-medium">{{ account.name }}</td>
+                                <td><span class="badge bg-primary-light text-primary-dark">{{ account.account_type.name }}</span></td>
+                                <td class="text-end fw-bold">₹ {{ account.current_balance|indian_currency }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="text-center py-5">
+                    <i class="fas fa-university fa-3x text-primary opacity-25 mb-3"></i>
+                    <p>You don't have any accounts yet.</p>
+                    <a href="{% url 'account_create' %}" class="btn btn-primary">
+                        <i class="fas fa-plus me-1"></i> Add Your First Account
+                    </a>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <!-- Recent Transactions -->
+    <div class="col-lg-6 mb-4">
+        <div class="card h-100">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">
+                    <i class="fas fa-history text-primary me-2"></i> Recent Transactions
+                </h5>
+                <a href="{% url 'transaction_create' %}" class="btn btn-sm btn-primary">
+                    <i class="fas fa-plus"></i> Add
+                </a>
+            </div>
+            <div class="card-body p-0">
+                {% if recent_transactions %}
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Category</th>
+                                <th>Account</th>
+                                <th class="text-end">Amount</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for transaction in recent_transactions %}
+                            <tr>
+                                <td>{{ transaction.date }}</td>
+                                <td>{{ transaction.category.name }}</td>
+                                <td><span class="small text-secondary">{{ transaction.account.name }}</span></td>
+                                <td class="text-end {% if transaction.transaction_type == 'EXPENSE' %}text-expense{% elif transaction.transaction_type == 'INCOME' %}text-income{% endif %}">
+                                    {% if transaction.transaction_type == 'EXPENSE' %}-{% endif %}
+                                    {% if transaction.transaction_type == 'INCOME' %}+{% endif %}
+                                    ₹ {{ transaction.amount|indian_currency }}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="text-center py-5">
+                    <i class="fas fa-exchange-alt fa-3x text-primary opacity-25 mb-3"></i>
+                    <p>No transactions recorded yet.</p>
+                    <a href="{% url 'transaction_create' %}" class="btn btn-primary">
+                        <i class="fas fa-plus me-1"></i> Add Your First Transaction
+                    </a>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4 slide-in">
+    <div class="col-12 mb-4">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">
+                    <i class="fas fa-chart-pie text-primary me-2"></i> Analytics & Reports
+                </h5>
+            </div>
+            <div class="card-body p-4">
+                <div class="row g-4 text-center">
+                    <div class="col-md-4">
+                        <div class="card h-100 border-0 bg-primary-light">
+                            <div class="card-body p-4">
+                                <div class="p-3 rounded-circle bg-white d-inline-flex align-items-center justify-content-center mb-3 shadow-sm" style="width: 80px; height: 80px;">
+                                    <i class="fas fa-chart-bar fa-2x text-primary"></i>
+                                </div>
+                                <h5 class="mt-2 mb-3 fw-bold">Spend Analysis</h5>
+                                <p class="text-secondary mb-4">Analyze your spending patterns by category</p>
+                                <a href="{% url 'dashboard' %}" class="btn btn-primary w-100">
+                                    View Analysis
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card h-100 border-0" style="background-color: #ecfdf5;">
+                            <div class="card-body p-4">
+                                <div class="p-3 rounded-circle bg-white d-inline-flex align-items-center justify-content-center mb-3 shadow-sm" style="width: 80px; height: 80px;">
+                                    <i class="fas fa-chart-line fa-2x text-success"></i>
+                                </div>
+                                <h5 class="mt-2 mb-3 fw-bold">Income Tracking</h5>
+                                <p class="text-secondary mb-4">Track your income sources and trends</p>
+                                <a href="{% url 'dashboard' %}" class="btn btn-success w-100">
+                                    View Income
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card h-100 border-0" style="background-color: #fffbeb;">
+                            <div class="card-body p-4">
+                                <div class="p-3 rounded-circle bg-white d-inline-flex align-items-center justify-content-center mb-3 shadow-sm" style="width: 80px; height: 80px;">
+                                    <i class="fas fa-file-export fa-2x text-warning"></i>
+                                </div>
+                                <h5 class="mt-2 mb-3 fw-bold">Export Data</h5>
+                                <p class="text-secondary mb-4">Export your financial data as CSV</p>
+                                <a href="{% url 'export_transactions_csv' %}" class="btn btn-warning w-100 text-white">
+                                    Export CSV
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
