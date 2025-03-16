@@ -8,25 +8,49 @@ from django.core.serializers.json import DjangoJSONEncoder
 import datetime
 
 def home(request):
-    # Get all accounts
-    accounts = Account.objects.all().order_by('-current_balance')
+    # Get sorting parameters from request
+    sort = request.GET.get('sort', 'balance')
+    order = request.GET.get('order', 'desc')
+    account_id = request.GET.get('account')
+    
+    # Get all accounts with sorting
+    if sort == 'name':
+        if order == 'asc':
+            accounts = Account.objects.all().order_by('name')
+        else:
+            accounts = Account.objects.all().order_by('-name')
+    else:
+        if order == 'asc':
+            accounts = Account.objects.all().order_by('current_balance')
+        else:
+            accounts = Account.objects.all().order_by('-current_balance')
     
     # Calculate total balance
-    total_balance = sum(account.current_balance for account in accounts)
+    if account_id:
+        total_balance = Account.objects.get(id=account_id).current_balance
+    else:
+        total_balance = sum(account.current_balance for account in accounts)
     
-    # Get recent transactions (last 5)
-    # recent_transactions = Transaction.objects.all().order_by('-date')[:5]
+    # Get recent transactions
     today = datetime.date.today()
     first_day_of_month = datetime.date(today.year, today.month, 1)
     recent_transactions = Transaction.objects.filter(
         date__gte=first_day_of_month,
         date__lte=today
-    ).order_by('-date')
+    )
+    
+    if account_id:
+        recent_transactions = recent_transactions.filter(account_id=account_id)
+    
+    recent_transactions = recent_transactions.order_by('-date')
     
     context = {
         'accounts': accounts,
         'total_balance': total_balance,
         'recent_transactions': recent_transactions,
+        'sort': sort,
+        'order': order,
+        'selected_account': int(account_id) if account_id else None
     }
     return render(request, 'dashboard/home.html', context)
 
@@ -34,6 +58,7 @@ def dashboard(request):
     # Get date range from request or use default (current month)
     start_date = request.GET.get('start_date')
     end_date = request.GET.get('end_date')
+    account_id = request.GET.get('account')
     
     today = datetime.date.today()
     
@@ -60,23 +85,30 @@ def dashboard(request):
     # Filter transactions by date range
     transactions = Transaction.objects.filter(date__range=[start_date, end_date])
     
+    # Apply account filter if selected
+    if account_id:
+        transactions = transactions.filter(account_id=account_id)
+    
+    # Get all accounts for the filter dropdown
+    accounts = Account.objects.all()
+    
     # Get spending by category - with case insensitive filtering
     category_spending = transactions.filter(
-        transaction_type__iexact='EXPENSE'  # Use case-insensitive matching
+        transaction_type__iexact='EXPENSE'
     ).values('category__name').annotate(
         total=Sum('amount')
     ).order_by('-total')
     
     # Get income by category - with case insensitive filtering
     category_income = transactions.filter(
-        transaction_type__iexact='INCOME'  # Use case-insensitive matching
+        transaction_type__iexact='INCOME'
     ).values('category__name').annotate(
         total=Sum('amount')
     ).order_by('-total')
     
     # Get monthly spending trend
     monthly_spending = transactions.filter(
-        transaction_type__iexact='EXPENSE'  # Use case-insensitive matching
+        transaction_type__iexact='EXPENSE'
     ).annotate(
         month=TruncMonth('date')
     ).values('month').annotate(
@@ -85,26 +117,12 @@ def dashboard(request):
     
     # Get monthly income trend
     monthly_income = transactions.filter(
-        transaction_type__iexact='INCOME'  # Use case-insensitive matching
+        transaction_type__iexact='INCOME'
     ).annotate(
         month=TruncMonth('date')
     ).values('month').annotate(
         total=Sum('amount')
     ).order_by('month')
-    
-    # Print debug info
-    print(f"Found {transactions.count()} transactions in date range")
-    try:
-        transaction_types = list(transactions.values_list('transaction_type', flat=True).distinct())
-        print(f"Transaction types in data: {transaction_types}")
-    except Exception as e:
-        print(f"Error getting transaction types: {e}")
-        transaction_types = []
-    
-    print(f"Found {len(category_spending)} expense categories")
-    print(f"Found {len(category_income)} income categories")
-    print(f"Found {len(monthly_spending)} months with expenses")
-    print(f"Found {len(monthly_income)} months with income")
     
     # Get yearly comparison
     yearly_comparison = transactions.annotate(
@@ -114,7 +132,6 @@ def dashboard(request):
     ).order_by('year', 'transaction_type')
     
     # Calculate year-on-year growth data
-    # Get data for multiple years
     yearly_data = Transaction.objects.annotate(
         year=TruncYear('date')
     ).values('year').annotate(
@@ -254,15 +271,20 @@ def dashboard(request):
         category_income_data['data'] = []
     
     context = {
-        'start_date': start_date,
-        'end_date': end_date,
+        'start_date': start_date.strftime('%Y-%m-%d'),
+        'end_date': end_date.strftime('%Y-%m-%d'),
+        'accounts': accounts,
+        'selected_account': int(account_id) if account_id else None,
+        'category_spending': category_spending,
+        'category_income': category_income,
+        'monthly_spending': monthly_spending,
+        'monthly_income': monthly_income,
+        'yearly_comparison': yearly_comparison,
+        'yoy_growth_data': json.dumps(yoy_growth_data, cls=DjangoJSONEncoder),
+        'transactions': transactions,
         'category_spending_data': json.dumps(category_spending_data),
         'category_income_data': json.dumps(category_income_data),
         'monthly_trend_data': json.dumps(monthly_trend_data),
-        'yoy_growth_data': json.dumps(yoy_growth_data, cls=DjangoJSONEncoder),
-        'transactions': transactions,
-        'category_spending': category_spending,
-        'category_income': category_income,
         'transaction_types': list(transactions.values_list('transaction_type', flat=True).distinct()),
     }
     

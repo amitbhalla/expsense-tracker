@@ -9,6 +9,21 @@
             <i class="fas fa-wallet text-primary me-2"></i>Amit's Expense Tracker
         </h1>
         <p class="lead">Tracks finances, manage accounts, and visualizes spending.</p>
+        <div class="d-flex gap-3 align-items-center mt-3">
+            <form method="get" class="d-flex gap-3 align-items-center">
+                <div class="form-group">
+                    <select name="account" class="form-select">
+                        <option value="">All Accounts</option>
+                        {% for account in accounts %}
+                            <option value="{{ account.id }}" {% if selected_account == account.id %}selected{% endif %}>
+                                {{ account.name }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <button type="submit" class="btn btn-primary">Filter</button>
+            </form>
+        </div>
         <hr>
     </div>
 </div>
@@ -51,9 +66,23 @@
                     <table class="table table-hover mb-0">
                         <thead>
                             <tr>
-                                <th>Account</th>
+                                <th>
+                                    <a href="?sort=name&order={% if sort == 'name' and order == 'asc' %}desc{% else %}asc{% endif %}" class="text-decoration-none text-dark sort-link">
+                                        Account
+                                        {% if sort == 'name' %}
+                                            <i class="fas fa-sort-{% if order == 'asc' %}up{% else %}down{% endif %} ms-1"></i>
+                                        {% endif %}
+                                    </a>
+                                </th>
                                 <th>Type</th>
-                                <th class="text-end">Balance</th>
+                                <th class="text-end">
+                                    <a href="?sort=balance&order={% if sort == 'balance' and order == 'asc' %}desc{% else %}asc{% endif %}" class="text-decoration-none text-dark sort-link">
+                                        Balance
+                                        {% if sort == 'balance' %}
+                                            <i class="fas fa-sort-{% if order == 'asc' %}up{% else %}down{% endif %} ms-1"></i>
+                                        {% endif %}
+                                    </a>
+                                </th>
                             </tr>
                         </thead>
                         <tbody>
@@ -190,4 +219,19 @@
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Handle sorting functionality
+    document.addEventListener('DOMContentLoaded', function() {
+        const sortLinks = document.querySelectorAll('.sort-link');
+        sortLinks.forEach(link => {
+            link.addEventListener('click', function(e) {
+                e.preventDefault();
+                window.location.href = this.href;
+            });
+        });
+    });
+</script>
 {% endblock %}
