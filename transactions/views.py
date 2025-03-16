@@ -17,6 +17,11 @@ def transaction_list(request):
     transactions_list = Transaction.objects.all().order_by('-date')
     categories = Category.objects.all().order_by('name')
     
+    # Get transaction type counts
+    total_transactions = transactions_list.count()
+    expense_count = transactions_list.filter(transaction_type='EXPENSE').count()
+    income_count = transactions_list.filter(transaction_type='INCOME').count()
+    
     # Set up pagination
     page = request.GET.get('page', 1)
     paginator = Paginator(transactions_list, 20)  # Show 20 transactions per page
@@ -31,6 +36,9 @@ def transaction_list(request):
     context = {
         'transactions': transactions,
         'categories': categories,
+        'total_transactions': total_transactions,
+        'expense_count': expense_count,
+        'income_count': income_count,
     }
     return render(request, 'transactions/transaction_list.html', context)
 

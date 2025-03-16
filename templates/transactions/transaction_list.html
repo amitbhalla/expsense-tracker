@@ -32,6 +32,11 @@
                 <h5 class="mb-0">
                     <i class="fas fa-list text-primary me-2"></i> All Transactions
                     <span class="badge bg-primary ms-2">{{ transactions.paginator.count }}</span>
+                    <span class="ms-3 text-secondary">
+                        (<span class="text-success">Income: {{ income_count }}</span>
+                        <span class="mx-2">|</span>
+                        <span class="text-danger">Expenses: {{ expense_count }}</span>)
+                    </span>
                 </h5>
                 <div>
                     <span class="text-secondary me-3">Page {{ transactions.number }} of {{ transactions.paginator.num_pages }}</span>
