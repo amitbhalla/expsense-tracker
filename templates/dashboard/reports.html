@@ -21,7 +21,7 @@
                 </h5>
             </div>
             <div class="card-body">
-                <form method="get" class="row g-3">
+                <form method="get" action="{% url 'reports' %}" class="row g-3">
                     <div class="col-md-3">
                         <label for="start_date" class="form-label">Start Date</label>
                         <input type="date" name="start_date" class="form-control" value="{{ start_date|date:'Y-m-d' }}">
@@ -32,7 +32,7 @@
                     </div>
                     <div class="col-md-3">
                         <label for="account" class="form-label">Account</label>
-                        <select name="account" class="form-select">
+                        <select name="account_id" class="form-select">
                             <option value="">All Accounts</option>
                             {% for account in accounts %}
                                 <option value="{{ account.id }}" {% if selected_account == account.id %}selected{% endif %}>
@@ -69,7 +69,7 @@
                     <i class="fas fa-chart-line text-primary me-2"></i>Spending Trends
                 </h5>
             </div>
-            <div class="card-body">
+            <div class="card-body" style="height: 300px; position: relative;">
                 <canvas id="trendChart"></canvas>
             </div>
         </div>
@@ -81,13 +81,13 @@
                     <i class="fas fa-balance-scale text-primary me-2"></i>Net Worth Over Time
                 </h5>
             </div>
-            <div class="card-body">
+            <div class="card-body" style="height: 300px; position: relative;">
                 <canvas id="netWorthChart"></canvas>
             </div>
         </div>
     </div>
 </div>
-
+<!--
 <div class="row mt-4 slide-in">
     <div class="col-12">
         <div class="card">
@@ -104,7 +104,7 @@
                             <div class="card-body text-center">
                                 <h5 class="card-title">{{ forecast.years }} Years</h5>
                                 <p class="card-text display-6">
-                                    {{ forecast.projected_net_worth|currency }}
+                                    {{ forecast.projected_net_worth|indian_currency }}
                                 </p>
                                 <small class="text-muted">Projected Net Worth</small>
                             </div>
@@ -116,7 +116,7 @@
         </div>
     </div>
 </div>
-
+-->
 <style>
     .forecast-card {
         background: linear-gradient(135deg, #f8f9fa, #e9ecef);
@@ -138,7 +138,13 @@
     .forecast-card small {
         color: #64748b;
     }
+    
+    .card-body canvas {
+        width: 100% !important;
+        height: 100% !important;
+    }
 </style>
+{% endblock content %}
 
 {% block extra_js %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -148,31 +154,86 @@
     new Chart(trendCtx, {
         type: 'line',
         data: {
-            labels: {{ monthly_trend|map:'month'|map:'date'|map:'date'|map:'str'|list|safe }},
+            labels: {{ chart_labels|safe }},
             datasets: [{
                 label: 'Income',
-                data: {{ monthly_trend|map:'income'|list|safe }},
+                data: {{ chart_income|safe }},
                 borderColor: '#28a745',
-                fill: false
+                backgroundColor: 'rgba(40, 167, 69, 0.1)',
+                fill: true,
+                tension: 0.4
             }, {
                 label: 'Expenses',
-                data: {{ monthly_trend|map:'expense'|list|safe }},
+                data: {{ chart_expenses|safe }},
                 borderColor: '#dc3545',
-                fill: false
+                backgroundColor: 'rgba(220, 53, 69, 0.1)',
+                fill: true,
+                tension: 0.4
             }]
         },
         options: {
             responsive: true,
             maintainAspectRatio: false,
-            scales: {
-                x: {
-                    type: 'time',
-                    time: {
-                        unit: 'month'
+            layout: {
+                padding: {
+                    top: 10,
+                    right: 10,
+                    bottom: 10,
+                    left: 10
+                }
+            },
+            plugins: {
+                legend: {
+                    position: 'top',
+                    labels: {
+                        boxWidth: 12,
+                        padding: 15
                     }
                 },
+                tooltip: {
+                    mode: 'index',
+                    intersect: false,
+                    callbacks: {
+                        label: function(context) {
+                            let label = context.dataset.label || '';
+                            if (label) {
+                                label += ': ';
+                            }
+                            if (context.parsed.y !== null) {
+                                label += '₹' + context.parsed.y.toLocaleString('en-IN');
+                            }
+                            return label;
+                        }
+                    }
+                }
+            },
+            interaction: {
+                mode: 'nearest',
+                axis: 'x',
+                intersect: false
+            },
+            scales: {
                 y: {
-                    beginAtZero: true
+                    beginAtZero: true,
+                    grid: {
+                        color: 'rgba(0, 0, 0, 0.1)',
+                        drawBorder: false
+                    },
+                    ticks: {
+                        maxTicksLimit: 8,
+                        callback: function(value) {
+                            return '₹' + value.toLocaleString('en-IN');
+                        }
+                    }
+                },
+                x: {
+                    grid: {
+                        color: 'rgba(0, 0, 0, 0.1)',
+                        drawBorder: false
+                    },
+                    ticks: {
+                        maxTicksLimit: 6
+                    }
                 }
             }
         }
@@ -183,30 +244,75 @@
     new Chart(netWorthCtx, {
         type: 'line',
         data: {
-            labels: {{ net_worth_data|map:'date'|map:'str'|list|safe }},
+            labels: {{ net_worth_dates|safe }},
             datasets: [{
                 label: 'Net Worth',
-                data: {{ net_worth_data|map:'value'|list|safe }},
+                data: {{ net_worth_values|safe }},
                 borderColor: '#007bff',
-                fill: false
+                backgroundColor: 'rgba(0, 123, 255, 0.1)',
+                fill: true,
+                tension: 0.4
             }]
         },
         options: {
             responsive: true,
             maintainAspectRatio: false,
-            scales: {
-                x: {
-                    type: 'time',
-                    time: {
-                        unit: 'month'
+            layout: {
+                padding: {
+                    top: 10,
+                    right: 10,
+                    bottom: 10,
+                    left: 10
+                }
+            },
+            plugins: {
+                legend: {
+                    position: 'top',
+                    labels: {
+                        boxWidth: 12,
+                        padding: 15
                     }
                 },
+                tooltip: {
+                    mode: 'index',
+                    intersect: false,
+                    callbacks: {
+                        label: function(context) {
+                            return 'Net Worth: ₹' + context.parsed.y.toLocaleString('en-IN');
+                        }
+                    }
+                }
+            },
+            interaction: {
+                mode: 'nearest',
+                axis: 'x',
+                intersect: false
+            },
+            scales: {
                 y: {
-                    beginAtZero: true
+                    beginAtZero: true,
+                    grid: {
+                        color: 'rgba(0, 0, 0, 0.1)',
+                        drawBorder: false
+                    },
+                    ticks: {
+                        maxTicksLimit: 8,
+                        callback: function(value) {
+                            return '₹' + value.toLocaleString('en-IN');
+                        }
+                    }
+                },
+                x: {
+                    grid: {
+                        color: 'rgba(0, 0, 0, 0.1)',
+                        drawBorder: false
+                    },
+                    ticks: {
+                        maxTicksLimit: 6
+                    }
                 }
             }
         }
     });
 </script>
-{% endblock %}
-{% endblock %}
+{% endblock extra_js %}

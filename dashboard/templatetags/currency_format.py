@@ -57,3 +57,11 @@ def indian_currency(value):
         result = "-" + result
     
     return result + "." + decimal_part
+
+@register.filter
+def map(value, arg):
+    """
+    Apply a mapping operation to an iterable, extracting a specific attribute from each item.
+    Usage: {{ my_list|map:'attribute_name' }}
+    """
+    return [getattr(item, arg) if hasattr(item, arg) else item.get(arg, '') for item in value]

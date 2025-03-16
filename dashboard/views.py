@@ -6,12 +6,14 @@ from transactions.models import Transaction, Category
 import json
 from django.core.serializers.json import DjangoJSONEncoder
 import datetime
+from sklearn.linear_model import LinearRegression
+import numpy as np
 
 def home(request):
     # Get sorting parameters from request
     sort = request.GET.get('sort', 'balance')
     order = request.GET.get('order', 'desc')
-    account_id = request.GET.get('account')
+    account_id = request.GET.get('account_id')
     
     # Get all accounts with sorting
     if sort == 'name':
@@ -58,7 +60,7 @@ def dashboard(request):
     # Get date range from request or use default (current month)
     start_date = request.GET.get('start_date')
     end_date = request.GET.get('end_date')
-    account_id = request.GET.get('account')
+    account_id = request.GET.get('account_id')
     
     today = datetime.date.today()
     
@@ -291,108 +293,176 @@ def dashboard(request):
     return render(request, 'dashboard/dashboard.html', context)
 
 def reports(request):
-    # Get filter parameters
+    # Get date range from request or use default (current month)
     start_date = request.GET.get('start_date')
     end_date = request.GET.get('end_date')
-    account_id = request.GET.get('account')
-    category_id = request.GET.get('category')
+    account_id = request.GET.get('account_id')
+    category_id = request.GET.get('category_id')
     
-    # Default date range (last 12 months)
     today = datetime.date.today()
-    if not start_date:
-        start_date = today - datetime.timedelta(days=365)
-    if not end_date:
-        end_date = today
     
-    # Get base transactions
+    if not start_date:
+        # Default to first day of current month
+        start_date = datetime.date(today.year, today.month, 1)
+    else:
+        try:
+            start_date = datetime.datetime.strptime(start_date, '%Y-%m-%d').date()
+        except ValueError:
+            # Handle invalid date format
+            start_date = datetime.date(today.year, today.month, 1)
+    
+    if not end_date:
+        # Default to today
+        end_date = today
+    else:
+        try:
+            end_date = datetime.datetime.strptime(end_date, '%Y-%m-%d').date()
+        except ValueError:
+            # Handle invalid date format
+            end_date = today
+    
+    # Filter transactions by date range
     transactions = Transaction.objects.filter(date__range=[start_date, end_date])
     
-    # Apply account filter
+    # Additional filters if provided
     if account_id:
         transactions = transactions.filter(account_id=account_id)
-    
-    # Apply category filter
     if category_id:
         transactions = transactions.filter(category_id=category_id)
     
-    # Calculate totals
-    total_income = transactions.filter(transaction_type='INCOME').aggregate(total=Sum('amount'))['total'] or 0
-    total_expense = transactions.filter(transaction_type='EXPENSE').aggregate(total=Sum('amount'))['total'] or 0
-    
-    # Get trend data
-    monthly_trend = transactions.annotate(month=TruncMonth('date')).values('month').annotate(
-        income=Sum('amount', filter=Q(transaction_type='INCOME')),
-        expense=Sum('amount', filter=Q(transaction_type='EXPENSE'))
+    # Get monthly spending and income trend
+    monthly_data = transactions.annotate(
+        month=TruncMonth('date')
+    ).values('month').annotate(
+        income=Sum('amount', filter=Q(transaction_type__iexact='INCOME')),
+        expense=Sum('amount', filter=Q(transaction_type__iexact='EXPENSE'))
     ).order_by('month')
     
-    # Get net worth over time
-    net_worth_data = []
-    current_date = start_date
-    while current_date <= end_date:
-        # Calculate total assets
-        assets = Account.objects.filter(
-            account_type__name='ASSET',  # If account_type is a ForeignKey to another model with a name field
-            created_at__lte=current_date
-        ).aggregate(total=Sum('current_balance'))['total'] or 0
-        
-        # Calculate total liabilities
-        liabilities = Account.objects.filter(
-            account_type__name='LIABILITY',  # If account_type is a ForeignKey to another model with a name field
-            created_at__lte=current_date
-        ).aggregate(total=Sum('current_balance'))['total'] or 0
-        
-        # Calculate net worth
-        net_worth = assets - liabilities
-        
-        net_worth_data.append({
-            'date': current_date,
-            'value': net_worth
-        })
-        
-        # Move to next month
-        if current_date.month == 12:
-            current_date = current_date.replace(year=current_date.year + 1, month=1)
+    # Filter transactions by account if selected
+    if account_id:
+        transactions = transactions.filter(account_id=account_id)
+        monthly_data = monthly_data.filter(account_id=account_id)
+    
+    # Now prepare the data for the charts
+    monthly_trend = list(monthly_data)  # Convert to list to make it iterable
+    
+    # Process the data for Chart.js
+    labels = []
+    income_data = []
+    expense_data = []
+    
+    # Convert your monthly_trend data to the format needed for the chart
+    for item in monthly_trend:
+        month_str = item['month'].strftime('%b %Y')
+        income = float(item.get('income', 0) or 0)  # Handle None values
+        expense = float(item.get('expense', 0) or 0)  # Handle None values
+            
+        labels.append(month_str)
+        income_data.append(income)
+        expense_data.append(expense)
+    
+    # Calculate historical net worth month by month
+    net_worth_dates = []
+    net_worth_values = []
+    
+    # Get initial balances for all accounts
+    accounts = Account.objects.all()
+    initial_balance = sum(account.opening_balance for account in accounts)
+    
+    # Get all months between start_date and end_date
+    current_month = start_date.replace(day=1)
+    months = []
+    while current_month <= end_date:
+        months.append(current_month)
+        # Get next month
+        if current_month.month == 12:
+            current_month = current_month.replace(year=current_month.year + 1, month=1)
         else:
-            current_date = current_date.replace(month=current_date.month + 1)
+            current_month = current_month.replace(month=current_month.month + 1)
     
-    # Get forecasting data
-    forecast_data = []
-    current_date = end_date
-    for years in [5, 10, 15, 20]:
-        # Calculate average monthly income
-        avg_income = transactions.filter(
-            transaction_type='INCOME',
-            date__range=[start_date, end_date]
-        ).aggregate(avg=Avg('amount'))['avg'] or 0
+    # Calculate cumulative net worth for each month
+    running_balance = initial_balance
+    for month in months:
+        month_end = month.replace(day=28) if month.month != 2 else month.replace(day=month.day)
         
-        # Calculate average monthly expense
-        avg_expense = transactions.filter(
-            transaction_type='EXPENSE',
-            date__range=[start_date, end_date]
-        ).aggregate(avg=Avg('amount'))['avg'] or 0
+        # Get all transactions up to this month
+        month_transactions = Transaction.objects.filter(date__lte=month_end)
         
-        # Calculate net worth growth per year
-        net_worth_growth = (avg_income - avg_expense) * 12
+        # Apply account filter if selected
+        if account_id:
+            month_transactions = month_transactions.filter(account_id=account_id)
         
-        # Calculate projected net worth
-        projected_net_worth = net_worth_data[-1]['value'] + (net_worth_growth * years)
+        # Calculate net effect of all transactions
+        income = month_transactions.filter(transaction_type__iexact='INCOME').aggregate(total=Sum('amount'))['total'] or 0
+        expenses = month_transactions.filter(transaction_type__iexact='EXPENSE').aggregate(total=Sum('amount'))['total'] or 0
         
-        forecast_data.append({
-            'years': years,
-            'projected_net_worth': projected_net_worth
-        })
+        # Update running balance
+        running_balance = initial_balance + income - expenses
+        
+        month_str = month.strftime('%b %Y')
+        net_worth_dates.append(month_str)
+        net_worth_values.append(float(running_balance))
     
+    # If no months found, use current net worth
+    if not months:
+        current_net_worth = sum(account.current_balance for account in accounts)
+        net_worth_dates.append(today.strftime('%b %Y'))
+        net_worth_values.append(float(current_net_worth))
+    
+    # Initialize current net worth
+    current_net_worth = net_worth_values[-1] if net_worth_values else 0
+
+    # Calculate historical growth rate
+    if len(net_worth_values) > 1:
+        growth_rates = []
+        for i in range(1, len(net_worth_values)):
+            if net_worth_values[i-1] > 0:
+                growth_rate = (net_worth_values[i] - net_worth_values[i-1]) / net_worth_values[i-1]
+                growth_rates.append(growth_rate)
+
+        # Use weighted average of growth rates, giving more weight to recent years
+        if growth_rates:
+            weights = list(range(1, len(growth_rates) + 1))
+            avg_growth_rate = sum(r * w for r, w in zip(growth_rates, weights)) / sum(weights)
+            
+            # Generate forecasts using historical growth rate
+            forecast_data = []
+            for years in [5, 10, 15, 20]:
+                projected_value = current_net_worth * (1 + avg_growth_rate) ** years
+                forecast_data.append({
+                    'years': years,
+                    'projected_net_worth': round(projected_value, 2)
+                })
+    else:
+        # Not enough historical data for projections
+        forecast_data = [
+            {'years': 5, 'projected_net_worth': current_net_worth * 1.25},
+            {'years': 10, 'projected_net_worth': current_net_worth * 1.5},
+            {'years': 15, 'projected_net_worth': current_net_worth * 1.75},
+            {'years': 20, 'projected_net_worth': current_net_worth * 2.0}
+        ]
+    
+    # Create context with JSON-serialized data
     context = {
         'start_date': start_date,
         'end_date': end_date,
-        'total_income': total_income,
-        'total_expense': total_expense,
+        'selected_account': int(account_id) if account_id else None,
+        'chart_labels': json.dumps(labels),
+        'chart_income': json.dumps(income_data),
+        'chart_expenses': json.dumps(expense_data),
+        
+        # Net worth chart data
+        'net_worth_dates': json.dumps(net_worth_dates),
+        'net_worth_values': json.dumps(net_worth_values),
+        
+        # Original data (if needed elsewhere in template)
         'monthly_trend': monthly_trend,
-        'net_worth_data': net_worth_data,
         'forecast_data': forecast_data,
+        
+        # Add accounts and categories for filter dropdowns if needed
         'accounts': Account.objects.all(),
         'categories': Category.objects.all(),
-        'selected_account': int(account_id) if account_id else None,
-        'selected_category': int(category_id) if category_id else None,
+        'selected_account': account_id,
     }
+    
     return render(request, 'dashboard/reports.html', context)
