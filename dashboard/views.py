@@ -1,5 +1,5 @@
 from django.shortcuts import render
-from django.db.models import Sum, Count, Q
+from django.db.models import Sum, Count, Q, Avg
 from django.db.models.functions import TruncMonth, TruncYear
 from accounts.models import Account
 from transactions.models import Transaction, Category
@@ -289,3 +289,110 @@ def dashboard(request):
     }
     
     return render(request, 'dashboard/dashboard.html', context)
+
+def reports(request):
+    # Get filter parameters
+    start_date = request.GET.get('start_date')
+    end_date = request.GET.get('end_date')
+    account_id = request.GET.get('account')
+    category_id = request.GET.get('category')
+    
+    # Default date range (last 12 months)
+    today = datetime.date.today()
+    if not start_date:
+        start_date = today - datetime.timedelta(days=365)
+    if not end_date:
+        end_date = today
+    
+    # Get base transactions
+    transactions = Transaction.objects.filter(date__range=[start_date, end_date])
+    
+    # Apply account filter
+    if account_id:
+        transactions = transactions.filter(account_id=account_id)
+    
+    # Apply category filter
+    if category_id:
+        transactions = transactions.filter(category_id=category_id)
+    
+    # Calculate totals
+    total_income = transactions.filter(transaction_type='INCOME').aggregate(total=Sum('amount'))['total'] or 0
+    total_expense = transactions.filter(transaction_type='EXPENSE').aggregate(total=Sum('amount'))['total'] or 0
+    
+    # Get trend data
+    monthly_trend = transactions.annotate(month=TruncMonth('date')).values('month').annotate(
+        income=Sum('amount', filter=Q(transaction_type='INCOME')),
+        expense=Sum('amount', filter=Q(transaction_type='EXPENSE'))
+    ).order_by('month')
+    
+    # Get net worth over time
+    net_worth_data = []
+    current_date = start_date
+    while current_date <= end_date:
+        # Calculate total assets
+        assets = Account.objects.filter(
+            account_type__name='ASSET',  # If account_type is a ForeignKey to another model with a name field
+            created_at__lte=current_date
+        ).aggregate(total=Sum('current_balance'))['total'] or 0
+        
+        # Calculate total liabilities
+        liabilities = Account.objects.filter(
+            account_type__name='LIABILITY',  # If account_type is a ForeignKey to another model with a name field
+            created_at__lte=current_date
+        ).aggregate(total=Sum('current_balance'))['total'] or 0
+        
+        # Calculate net worth
+        net_worth = assets - liabilities
+        
+        net_worth_data.append({
+            'date': current_date,
+            'value': net_worth
+        })
+        
+        # Move to next month
+        if current_date.month == 12:
+            current_date = current_date.replace(year=current_date.year + 1, month=1)
+        else:
+            current_date = current_date.replace(month=current_date.month + 1)
+    
+    # Get forecasting data
+    forecast_data = []
+    current_date = end_date
+    for years in [5, 10, 15, 20]:
+        # Calculate average monthly income
+        avg_income = transactions.filter(
+            transaction_type='INCOME',
+            date__range=[start_date, end_date]
+        ).aggregate(avg=Avg('amount'))['avg'] or 0
+        
+        # Calculate average monthly expense
+        avg_expense = transactions.filter(
+            transaction_type='EXPENSE',
+            date__range=[start_date, end_date]
+        ).aggregate(avg=Avg('amount'))['avg'] or 0
+        
+        # Calculate net worth growth per year
+        net_worth_growth = (avg_income - avg_expense) * 12
+        
+        # Calculate projected net worth
+        projected_net_worth = net_worth_data[-1]['value'] + (net_worth_growth * years)
+        
+        forecast_data.append({
+            'years': years,
+            'projected_net_worth': projected_net_worth
+        })
+    
+    context = {
+        'start_date': start_date,
+        'end_date': end_date,
+        'total_income': total_income,
+        'total_expense': total_expense,
+        'monthly_trend': monthly_trend,
+        'net_worth_data': net_worth_data,
+        'forecast_data': forecast_data,
+        'accounts': Account.objects.all(),
+        'categories': Category.objects.all(),
+        'selected_account': int(account_id) if account_id else None,
+        'selected_category': int(category_id) if category_id else None,
+    }
+    return render(request, 'dashboard/reports.html', context)
