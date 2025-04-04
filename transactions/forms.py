@@ -23,6 +23,12 @@ class TransactionForm(forms.ModelForm):
             'date': DateInput(attrs={'class': 'form-control', 'type': 'date'}),
             'description': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
         }
+        
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Order accounts by account type name then account name
+        self.fields['account'].queryset = self.fields['account'].queryset.order_by('account_type__name', 'name')
+        self.fields['account'].label_from_instance = lambda obj: f"{obj.account_type.name} - {obj.name}"
 
 class TransferForm(forms.ModelForm):
     class Meta:
